@@ -1,0 +1,77 @@
+name: Docker Health Check with Annotations
+
+on: 
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Test type'
+        required: true
+        default: 'success'
+        type: choice
+        options:
+        - success
+        - failure
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 1. Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      # 2. Build Docker image
+      - name: Build Docker image
+        run: |
+          echo "🐳 Building Docker image..."
+          docker build -t flask-healthcheck .
+          
+      # 3. Run container in background
+      - name: Start Flask server
+        run: |
+          echo "🚀 Starting Flask server in Docker..."
+          docker run -d -p 5000:5000 --name flask-server flask-healthcheck
+          echo "⏳ Waiting for server to start..."
+          sleep 10
+          
+      # 4. Check container status
+      - name: Verify container status
+        run: |
+          echo "📊 Checking container status..."
+          docker ps
+          echo "📋 Server logs:"
+          docker logs flask-server || echo "No logs available"
+          
+      # 5. Run health check (success case)
+      - name: Run health check - SUCCESS
+        if: github.event.inputs.test_type != 'failure'
+        run: |
+          echo "🧪 Running health check (should succeed)..."
+          python client_colored.py
+          
+      # 6. Run health check (failure case)
+      - name: Run health check - FAILURE
+        if: github.event.inputs.test_type == 'failure'
+        run: |
+          echo "🧪 Running health check (should fail)..."
+          python client_fail_colored.py
+          
+      # 7. Success notification
+      - name: Success notification
+        if: success() && github.event.inputs.test_type != 'failure'
+        run: |
+          echo "::notice title=All Tests Passed::✅ Docker health check completed successfully!"
+          echo "🎉 ${OK}ALL CHECKS PASSED${RST} - Server is running correctly"
+          
+      # 8. Cleanup
+      - name: Cleanup containers
+        if: always()
+        run: |
+          echo "🧹 Cleaning up..."
+          docker stop flask-server 2>/dev/null || true
+          docker rm flask-server 2>/dev/null || true
