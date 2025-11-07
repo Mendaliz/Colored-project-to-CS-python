@@ -5,6 +5,16 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Test type'
+        required: true
+        default: 'success'
+        type: choice
+        options:
+        - success
+        - failure
 
 jobs:
   health-check:
@@ -46,7 +56,7 @@ jobs:
           
       # 6. Run health check (failure case)
       - name: Run health check - FAILURE
-        #if: github.event.inputs.test_type == 'failure'
+        if: github.event.inputs.test_type == 'failure'
         run: |
           echo "🧪 Running health check (should fail)..."
           python client_fail_colored.py
